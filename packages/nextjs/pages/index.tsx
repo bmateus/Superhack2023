@@ -1,61 +1,78 @@
-import Link from "next/link";
+import { useEffect, useState } from "react";
+//import Link from "next/link";
 import type { NextPage } from "next";
-import { BugAntIcon, MagnifyingGlassIcon, SparklesIcon } from "@heroicons/react/24/outline";
+//import { BugAntIcon, MagnifyingGlassIcon, SparklesIcon } from "@heroicons/react/24/outline";
 import { MetaHeader } from "~~/components/MetaHeader";
+import { CanvasView, Pixel } from "~~/components/canvas-view/CanvasView";
+import { ControlView } from "~~/components/canvas-view/ControlView";
+import { PaletteView } from "~~/components/canvas-view/PaletteView";
+import { useScaffoldContractRead } from "~~/hooks/scaffold-eth";
 
 const Home: NextPage = () => {
+  const [selectedCanvas, setSelectedCanvas] = useState(1);
+  const [isCanvasLocked, setIsCanvasLocked] = useState(false);
+  const [selectedColor, setSelectedColor] = useState(0);
+  const [uncommittedPixels, setUncommittedPixels] = useState<Pixel[]>([]);
+  const [canvasTitle, setCanvasTitle] = useState("New Canvas");
+
+  const { data: canvasState, refetch: getCanvasState } = useScaffoldContractRead({
+    contractName: "Canvas",
+    functionName: "canvasData",
+    args: [BigInt(selectedCanvas)],
+  });
+
+  const { data: committedPixels, refetch: getCommittedPixels } = useScaffoldContractRead({
+    contractName: "Canvas",
+    functionName: "getPixels",
+    args: [BigInt(selectedCanvas)],
+  });
+
+  const onCanvasSelected = () => {
+    const canvasId = 1;
+    setSelectedCanvas(canvasId);
+  };
+
+  useEffect(() => {
+    //console.log("Refetching");
+    Promise.all([
+      getCanvasState().then(() => {
+        let title: string = canvasState ? canvasState[0] : "New Canvas";
+        if (title == "") title = "Canvas #" + selectedCanvas;
+        const isLocked: boolean = canvasState ? Boolean(canvasState[1]) : false;
+        setCanvasTitle(title);
+        setIsCanvasLocked(isLocked);
+      }),
+      getCommittedPixels(),
+    ]).then(() => {
+      //console.log("..done refetching");
+    });
+  }, [getCommittedPixels, getCanvasState, selectedCanvas, canvasState]);
+
   return (
     <>
       <MetaHeader />
-      <div className="flex items-center flex-col flex-grow pt-10">
-        <div className="px-5">
-          <h1 className="text-center mb-8">
-            <span className="block text-2xl mb-2">Welcome to</span>
-            <span className="block text-4xl font-bold">Scaffold-ETH 2</span>
-          </h1>
-          <p className="text-center text-lg">
-            Get started by editing{" "}
-            <code className="italic bg-base-300 text-base font-bold">packages/nextjs/pages/index.tsx</code>
-          </p>
-          <p className="text-center text-lg">
-            Edit your smart contract <code className="italic bg-base-300 text-base font-bold">YourContract.sol</code> in{" "}
-            <code className="italic bg-base-300 text-base font-bold">packages/hardhat/contracts</code>
-          </p>
+      <div className="flex" data-theme="scaffoldEthDark">
+        <div className="flex-none">
+          <PaletteView selectedColor={selectedColor} onColorSelected={color => setSelectedColor(color)} />
+          <ControlView
+            selectedCanvas={selectedCanvas}
+            uncommittedPixels={uncommittedPixels}
+            setUncommittedPixels={setUncommittedPixels}
+            isCanvasLocked={isCanvasLocked}
+          />
         </div>
-
-        <div className="flex-grow bg-base-300 w-full mt-16 px-8 py-12">
-          <div className="flex justify-center items-center gap-12 flex-col sm:flex-row">
-            <div className="flex flex-col bg-base-100 px-10 py-10 text-center items-center max-w-xs rounded-3xl">
-              <BugAntIcon className="h-8 w-8 fill-secondary" />
-              <p>
-                Tinker with your smart contract using the{" "}
-                <Link href="/debug" passHref className="link">
-                  Debug Contract
-                </Link>{" "}
-                tab.
-              </p>
-            </div>
-            <div className="flex flex-col bg-base-100 px-10 py-10 text-center items-center max-w-xs rounded-3xl">
-              <SparklesIcon className="h-8 w-8 fill-secondary" />
-              <p>
-                Experiment with{" "}
-                <Link href="/example-ui" passHref className="link">
-                  Example UI
-                </Link>{" "}
-                to build your own UI.
-              </p>
-            </div>
-            <div className="flex flex-col bg-base-100 px-10 py-10 text-center items-center max-w-xs rounded-3xl">
-              <MagnifyingGlassIcon className="h-8 w-8 fill-secondary" />
-              <p>
-                Explore your local transactions with the{" "}
-                <Link href="/blockexplorer" passHref className="link">
-                  Block Explorer
-                </Link>{" "}
-                tab.
-              </p>
-            </div>
+        <div className="flex-grow m-16">
+          <div className="flex flex-row place-items-center">
+            <h1>{canvasTitle}</h1>
+            <div className="flex-grow"></div>
+            <button onClick={onCanvasSelected}>Refresh</button>
           </div>
+          <CanvasView
+            selectedColor={selectedColor}
+            committedPixels={committedPixels as number[]}
+            uncommittedPixels={uncommittedPixels}
+            setUncommittedPixels={setUncommittedPixels}
+          />
         </div>
       </div>
     </>
