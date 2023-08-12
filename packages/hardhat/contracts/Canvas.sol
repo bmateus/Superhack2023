@@ -6,58 +6,60 @@ import "@openzeppelin/contracts/token/ERC721/utils/ERC721Holder.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
-import "./Colors.sol";
+//import "@openzeppelin/contracts/utils/Base64.sol";
+//import "./Colors.sol";
 
-// Useful for debugging. Remove when deploying to a live network.
-import "hardhat/console.sol";
+// Splatter Party Canvas v0.1.0 - Superhack 2023
 
 contract Canvas is ERC721, ERC721Holder, Ownable {
 	using Counters for Counters.Counter;
-    using Strings for uint256;
+	using Strings for uint256;
 	using Strings for uint16;
 
 	// canvas dimensions
-	uint256 public constant CANVAS_WIDTH = 16;
-	uint256 public constant CANVAS_HEIGHT = 16;
+	uint256 public constant CANVAS_WIDTH = 64;
+	uint256 public constant CANVAS_HEIGHT = 64;
+
+	// the minimum amount of time before this canvas can be locked
+	// and a new one can be created
+	uint256 public constant MINIMUM_UNLOCK_TIME = 8 hours;
 
 	//canvas state
 	uint256 public constant NUM_PIXELS = CANVAS_WIDTH * CANVAS_HEIGHT;
 
 	struct State {
+		uint256 createdTime;
 		string title;
 		bool locked;
 		uint16[NUM_PIXELS] iColor;
-		string[NUM_PIXELS] colorStr;
+		string svg;
+		mapping(address => uint256) contributions;
+		address[] contributors;
 	}
 
-	struct Pixel {
-		uint16 x;
-		uint16 y;
-		uint16 iColor;
-	}
-
-	Colors public colorsContract;
+	//Colors public colorsContract;
 
 	mapping(uint256 => State) public canvasData;
 
 	Counters.Counter private tokenIdCounter;
 
-	//the cost to lock a canvas
-	uint256 public constant LOCK_COST = 0.0005 ether;
+	string lockedTokenURI = "ipfs://QmdGou6abaRtYAnN2oqoF9K4WurAb8rS7FymwAepFiqch2";
 
 	error InvalidTokenID(uint256 tokenID);
-	error CanvasLocked(uint256 tokenID);
-	error CanvasNotFilled(uint256 tokenID);
+	error CanvasIsLocked(uint256 tokenID);
+	error NotReadyToLock(uint256 tokenID);
 	error ColorNotOwnedByAddress(uint256 color, address owner);
-	error InvalidPixel(uint16 x, uint16 y);
+	error InvalidPixelOffset(uint16 offset);
 	error OnlyOneUnlockedCanvas(uint256 tokenID);
 	error CantTransferUntilLocked(uint256 tokenID);
 
-	//event CanvasUpdated(uint256 tokenID, Pixel[] pixels);
-    event CanvasUpdated(uint256 tokenID, uint16[] xCoords, uint16[] yCoords, uint16[] colorIds);
+	event CanvasUpdated(uint256 tokenID, uint16[] colorIds, uint16[] positions, address sender);
+	event CanvasLocked(uint256 tokenID, string title);
 
-	constructor(Colors _colorsContract) ERC721("Canvas", "CANVAS") {
-		colorsContract = _colorsContract;
+	constructor(
+		//Colors _colorsContract
+		) ERC721("Canvas", "CANVAS") {
+		//colorsContract = _colorsContract;
 	}
 
 	function totalSupply() public view returns (uint256) {
@@ -66,9 +68,7 @@ contract Canvas is ERC721, ERC721Holder, Ownable {
 
 	// anyone can mint a new shared canvas
 	// but only if the last canvas has been locked
-	function createNewCanvas() public {
-		console.log("createNewCanvas");
-
+	function createNewCanvas() public returns (uint256) {
 		uint256 tokenId = tokenIdCounter.current();
 		//check that the last canvas is locked
 		if (tokenId > 0) {
@@ -78,100 +78,90 @@ contract Canvas is ERC721, ERC721Holder, Ownable {
 
 		tokenIdCounter.increment();
 		_safeMint(address(this), tokenIdCounter.current()); //the contract owns the token until it has been locked
+
+		//update the state
+		State storage newState = canvasData[tokenIdCounter.current()];
+		newState.createdTime = block.timestamp;
+
+		return tokenIdCounter.current();
 	}
 
-    function getPixels(uint256 tokenId) external view returns (uint16[NUM_PIXELS] memory)
-    {
-        //check if it is valid
-        if (!_exists(tokenId)) revert InvalidTokenID(tokenId);
-        State memory state = canvasData[tokenId];
-        return state.iColor;
-    }
+	function getPixels(
+		uint256 tokenId
+	) external view returns (uint16[NUM_PIXELS] memory) {
+		//check if it is valid
+		if (!_exists(tokenId)) revert InvalidTokenID(tokenId);
+		State storage state = canvasData[tokenId];
+		return state.iColor;
+	}
 
+	function getContributors(
+		uint256 tokenId
+	) external view returns (address[] memory contributors, uint256[] memory pixelCount) {
+		//check if it is valid
+		if (!_exists(tokenId)) revert InvalidTokenID(tokenId);
+		State storage state = canvasData[tokenId];
+		contributors = state.contributors;
+		pixelCount = new uint256[](contributors.length);
+		for (uint256 i = 0; i < contributors.length; i++) {
+			pixelCount[i] = state.contributions[contributors[i]];
+		}
+	}
 
-	//function commitPixels(uint256 tokenID, Pixel[] calldata pixels) public {
-    function commitPixels(uint256 tokenID, uint16[] calldata xCoords, uint16[] calldata yCoords, uint16[] calldata colorIds) external {
+	function getLockTime(uint256 tokenId) external view returns (uint256) {
+		//check if it is valid
+		if (!_exists(tokenId)) revert InvalidTokenID(tokenId);
+		State storage state = canvasData[tokenId];
+		return state.createdTime + MINIMUM_UNLOCK_TIME;
+	}
+
+	function commitPixels(
+		uint256 tokenID,
+		uint16[] calldata colorIds,
+		uint16[] calldata positions
+	) external {
+
 		//check that the tokenID is valid
 		if (!_exists(tokenID)) revert InvalidTokenID(tokenID);
 
 		State storage state = canvasData[tokenID];
+
 		//check that the canvas is not locked
-		if (state.locked) revert CanvasLocked(tokenID);
+		if (state.locked) revert CanvasIsLocked(tokenID);
 
-		//for (uint256 i = 0; i < pixels.length; i++) {
-        for (uint256 i = 0; i < colorIds.length; i++) {
-
-            //uint16 x = pixels[i].x;
-            //uint16 y = pixels[i].y;
-            //uint16 colorId = pixels[i].iColor;
-
-            uint16 x = xCoords[i];
-            uint16 y = yCoords[i];
-            uint16 colorId = colorIds[i];
+		for (uint256 i = 0; i < colorIds.length; i++) {
+			uint16 colorId = colorIds[i];
+			uint16 offset = positions[i];
 
 			//check that the pixel is in bounds
-			if (x >= CANVAS_WIDTH || y >= CANVAS_HEIGHT)
-				revert InvalidPixel(x, y);
-
-			uint256 offset = (y * CANVAS_WIDTH) + x;
-
-			//check that the color is owned by the sender
-			//(should only own valid colors)
-			//if (msg.sender != colorsContract.ownerOf(colorId))
-			//  revert ColorNotOwnedByAddress(colorId, msg.sender);
+			if (offset >= NUM_PIXELS) revert InvalidPixelOffset(offset);
 
 			state.iColor[offset] = colorId;
-
-            //write svg string here cause its super slow in tokenUri?
-            //this is pretty brutal for gas...maybe just when locked?
-
-            /*
-            string memory xStr = x.toString();
-            string memory yStr = y.toString();
-
-			state.colorStr[offset] = string(
-				abi.encodePacked(
-					"<path d='M",
-					xStr,
-					" ",
-					yStr,
-					"h1v1H",
-					xStr,
-					"z' fill='#",
-					getColorString(colorId),
-					"'/>"
-				)
-			);
-            */
 		}
 
+		//record the contribution
+		if (state.contributions[msg.sender] == 0)
+			state.contributors.push(msg.sender);
+		state.contributions[msg.sender] += colorIds.length;
+
 		//send an event that the canvas has been updated
-		//emit CanvasUpdated(tokenID, pixels);
-        emit CanvasUpdated(tokenID, xCoords, yCoords, colorIds);
+		emit CanvasUpdated(tokenID, colorIds, positions, msg.sender);
 	}
 
 	// lock the canvas so that it can't be updated
-	// - locking the canvas requires that all the pixels are filled
 	// - whoever locks the canvas will be the new owner and be able to set the title
 	// - the canvas can only be locked once
-	// - locking the canvas costs a locking fee; the fee is split between the color owners by their
-	//   contribution amount
-	function lockCanvas(uint256 tokenID, string calldata title) public payable {
+	function lockCanvas(uint256 tokenID, string calldata title) public {
 		//check that the tokenID is valid
 		if (!_exists(tokenID)) revert InvalidTokenID(tokenID);
 
 		State storage state = canvasData[tokenID];
-		//check that the canvas is not locked
-		if (state.locked) revert CanvasLocked(tokenID);
+		//check that the canvas is not already locked
+		if (state.locked) revert CanvasIsLocked(tokenID);
 
-		//check that all the pixels are filled
-		//i.e. values should be [1,4096]
-		for (uint256 i = 0; i < NUM_PIXELS; i++) {
-			if (state.iColor[i] == 0) revert CanvasNotFilled(tokenID);
-		}
-
-		//check that the sender has sent enough ether
-		if (msg.value < LOCK_COST) revert("Insufficient funds");
+		//check that the minimum time has passed
+		if (block.timestamp - state.createdTime < MINIMUM_UNLOCK_TIME)
+			revert NotReadyToLock(tokenID);
 
 		//lock the canvas
 		state.locked = true;
@@ -179,10 +169,18 @@ contract Canvas is ERC721, ERC721Holder, Ownable {
 		//set the title
 		state.title = title;
 
-		//todo: start an auction for the canvas
+		//lock in the pixels // OOOF GAS
+		state.svg = generateSVG(tokenID);
 
-		//transfer the canvas to the sender
+		//TODO: look into Base64 png encoding instead
+
+		//TODO: start an auction for the canvas
+
+		//for this version , just transfer the canvas to the sender
+		//they paid all that gas, they deserve it
 		_transfer(ownerOf(tokenID), msg.sender, tokenID);
+
+		emit CanvasLocked(tokenID, title);
 	}
 
 	bytes16 private constant _HEX_SYMBOLS = "0123456789abcdef";
@@ -191,7 +189,7 @@ contract Canvas is ERC721, ERC721Holder, Ownable {
 		return bytes1(_HEX_SYMBOLS[_i]);
 	}
 
-    //colorVal should be in range [0,4096)
+	//colorVal should be in range [0,4096)
 	function getColorString(
 		uint16 colorVal
 	) internal pure returns (bytes3 str) {
@@ -202,7 +200,7 @@ contract Canvas is ERC721, ERC721Holder, Ownable {
 		];
 
 		str = bytes3(
-			abi.encodePacked(				
+			abi.encodePacked(
 				uintToHex(rgb[0]),
 				uintToHex(rgb[1]),
 				uintToHex(rgb[2])
@@ -220,43 +218,73 @@ contract Canvas is ERC721, ERC721Holder, Ownable {
 		//get the canvas state
 		State storage state = canvasData[tokenID];
 
-		//create the metadata string
-		string memory metadata = string(
+		if (state.locked) {
+			//create the metadata string
+			string memory metadata = string(
+				abi.encodePacked(
+					'{"name": ',
+					state.title,
+					'", "description": "Splatter Party #',
+					tokenID,
+					', "image": "data:image/svg+xml;utf8,',
+					state.svg,
+					'" }'
+				)
+			);
+
+			//return the metadata
+			return metadata;
+		}
+		return lockedTokenURI;
+	}
+	
+	function generateSVG(uint256 tokenID) internal view returns (string memory svg) {
+		if (!_exists(tokenID)) revert InvalidTokenID(tokenID);
+
+		//get the canvas state
+		State storage state = canvasData[tokenID];
+
+		svg = string(
 			abi.encodePacked(
-				'{"name": ',
-				state.title,
-				'", "description": "A ',
-				CANVAS_WIDTH.toString(),
-				"x",
-				CANVAS_HEIGHT.toString(),
-				' pixel canvas", "image": "data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox="0 0 ',
+				"<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 ",
 				CANVAS_WIDTH.toString(),
 				" ",
 				CANVAS_HEIGHT.toString(),
-				'">'
+				"'>"
 			)
 		);
 
 		//loop through the pixels and add them to the metadata
-		for (uint256 i = 0; i < 256; i++) {
-            if (state.iColor[i] != 0)
-			    metadata = string(
-                    abi.encodePacked(
-					    metadata,
-                        state.colorStr[i]));
+		for (uint256 i = 0; i < NUM_PIXELS; i++) {
+			if (state.iColor[i] != 0) {
+				string memory xStr = (i % CANVAS_WIDTH).toString();
+				string memory yStr = (i / CANVAS_WIDTH).toString();
 
+				string memory colorStr = string(
+					abi.encodePacked(
+						"<path d='M",
+						xStr,
+						" ",
+						yStr,
+						"h1v1H",
+						xStr,
+						"z' fill='#",
+						getColorString(state.iColor[i]),
+						"'/>"
+					)
+				);
+
+				svg = string(abi.encodePacked(svg, colorStr));
+			}
 		}
 
-		//finish the metadata
-		metadata = string(abi.encodePacked(metadata, '</svg>" }'));
-
-		//return the metadata
-		return metadata;
+		//finish
+		svg = string(abi.encodePacked(svg, "</svg>"));
 	}
 
 	// override transfer behaviour;
 	// canvas can only be transferred if locked
-	// royalties are paid to the color owners by their contribution amount
+	// TODO: (maybe) royalties are paid to the color owners by their contribution amount
 	function _beforeTokenTransfer(
 		address from,
 		address /*to*/,
@@ -272,6 +300,6 @@ contract Canvas is ERC721, ERC721Holder, Ownable {
 			}
 		}
 
-		//split royalties
+		//TODO: split royalties
 	}
 }

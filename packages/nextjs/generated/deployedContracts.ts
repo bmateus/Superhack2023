@@ -5,16 +5,10 @@ const contracts = {
       name: "localhost",
       contracts: {
         Canvas: {
-          address: "0x4C4a2f8c81640e47606d3fd77B353E87Ba015584",
+          address: "0xc3e53F4d16Ae77Db1c982e75a937B9f60FE63690",
           abi: [
             {
-              inputs: [
-                {
-                  internalType: "contract Colors",
-                  name: "_colorsContract",
-                  type: "address",
-                },
-              ],
+              inputs: [],
               stateMutability: "nonpayable",
               type: "constructor",
             },
@@ -37,18 +31,7 @@ const contracts = {
                   type: "uint256",
                 },
               ],
-              name: "CanvasLocked",
-              type: "error",
-            },
-            {
-              inputs: [
-                {
-                  internalType: "uint256",
-                  name: "tokenID",
-                  type: "uint256",
-                },
-              ],
-              name: "CanvasNotFilled",
+              name: "CanvasIsLocked",
               type: "error",
             },
             {
@@ -71,16 +54,11 @@ const contracts = {
               inputs: [
                 {
                   internalType: "uint16",
-                  name: "x",
-                  type: "uint16",
-                },
-                {
-                  internalType: "uint16",
-                  name: "y",
+                  name: "offset",
                   type: "uint16",
                 },
               ],
-              name: "InvalidPixel",
+              name: "InvalidPixelOffset",
               type: "error",
             },
             {
@@ -92,6 +70,17 @@ const contracts = {
                 },
               ],
               name: "InvalidTokenID",
+              type: "error",
+            },
+            {
+              inputs: [
+                {
+                  internalType: "uint256",
+                  name: "tokenID",
+                  type: "uint256",
+                },
+              ],
+              name: "NotReadyToLock",
               type: "error",
             },
             {
@@ -166,21 +155,40 @@ const contracts = {
                 },
                 {
                   indexed: false,
-                  internalType: "uint16[]",
-                  name: "xCoords",
-                  type: "uint16[]",
+                  internalType: "string",
+                  name: "title",
+                  type: "string",
                 },
+              ],
+              name: "CanvasLocked",
+              type: "event",
+            },
+            {
+              anonymous: false,
+              inputs: [
                 {
                   indexed: false,
-                  internalType: "uint16[]",
-                  name: "yCoords",
-                  type: "uint16[]",
+                  internalType: "uint256",
+                  name: "tokenID",
+                  type: "uint256",
                 },
                 {
                   indexed: false,
                   internalType: "uint16[]",
                   name: "colorIds",
                   type: "uint16[]",
+                },
+                {
+                  indexed: false,
+                  internalType: "uint16[]",
+                  name: "positions",
+                  type: "uint16[]",
+                },
+                {
+                  indexed: false,
+                  internalType: "address",
+                  name: "sender",
+                  type: "address",
                 },
               ],
               name: "CanvasUpdated",
@@ -258,7 +266,7 @@ const contracts = {
             },
             {
               inputs: [],
-              name: "LOCK_COST",
+              name: "MINIMUM_UNLOCK_TIME",
               outputs: [
                 {
                   internalType: "uint256",
@@ -330,6 +338,11 @@ const contracts = {
               name: "canvasData",
               outputs: [
                 {
+                  internalType: "uint256",
+                  name: "createdTime",
+                  type: "uint256",
+                },
+                {
                   internalType: "string",
                   name: "title",
                   type: "string",
@@ -339,18 +352,10 @@ const contracts = {
                   name: "locked",
                   type: "bool",
                 },
-              ],
-              stateMutability: "view",
-              type: "function",
-            },
-            {
-              inputs: [],
-              name: "colorsContract",
-              outputs: [
                 {
-                  internalType: "contract Colors",
-                  name: "",
-                  type: "address",
+                  internalType: "string",
+                  name: "svg",
+                  type: "string",
                 },
               ],
               stateMutability: "view",
@@ -365,17 +370,12 @@ const contracts = {
                 },
                 {
                   internalType: "uint16[]",
-                  name: "xCoords",
-                  type: "uint16[]",
-                },
-                {
-                  internalType: "uint16[]",
-                  name: "yCoords",
-                  type: "uint16[]",
-                },
-                {
-                  internalType: "uint16[]",
                   name: "colorIds",
+                  type: "uint16[]",
+                },
+                {
+                  internalType: "uint16[]",
+                  name: "positions",
                   type: "uint16[]",
                 },
               ],
@@ -387,7 +387,13 @@ const contracts = {
             {
               inputs: [],
               name: "createNewCanvas",
-              outputs: [],
+              outputs: [
+                {
+                  internalType: "uint256",
+                  name: "",
+                  type: "uint256",
+                },
+              ],
               stateMutability: "nonpayable",
               type: "function",
             },
@@ -418,12 +424,55 @@ const contracts = {
                   type: "uint256",
                 },
               ],
+              name: "getContributors",
+              outputs: [
+                {
+                  internalType: "address[]",
+                  name: "contributors",
+                  type: "address[]",
+                },
+                {
+                  internalType: "uint256[]",
+                  name: "pixelCount",
+                  type: "uint256[]",
+                },
+              ],
+              stateMutability: "view",
+              type: "function",
+            },
+            {
+              inputs: [
+                {
+                  internalType: "uint256",
+                  name: "tokenId",
+                  type: "uint256",
+                },
+              ],
+              name: "getLockTime",
+              outputs: [
+                {
+                  internalType: "uint256",
+                  name: "",
+                  type: "uint256",
+                },
+              ],
+              stateMutability: "view",
+              type: "function",
+            },
+            {
+              inputs: [
+                {
+                  internalType: "uint256",
+                  name: "tokenId",
+                  type: "uint256",
+                },
+              ],
               name: "getPixels",
               outputs: [
                 {
-                  internalType: "uint16[256]",
+                  internalType: "uint16[4096]",
                   name: "",
-                  type: "uint16[256]",
+                  type: "uint16[4096]",
                 },
               ],
               stateMutability: "view",
@@ -468,7 +517,7 @@ const contracts = {
               ],
               name: "lockCanvas",
               outputs: [],
-              stateMutability: "payable",
+              stateMutability: "nonpayable",
               type: "function",
             },
             {
@@ -729,7 +778,7 @@ const contracts = {
           ],
         },
         Colors: {
-          address: "0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0",
+          address: "0x5FbDB2315678afecb367f032d93F642f64180aa3",
           abi: [
             {
               inputs: [],
@@ -1314,148 +1363,6 @@ const contracts = {
               outputs: [],
               stateMutability: "nonpayable",
               type: "function",
-            },
-          ],
-        },
-        YourContract: {
-          address: "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e",
-          abi: [
-            {
-              inputs: [
-                {
-                  internalType: "address",
-                  name: "_owner",
-                  type: "address",
-                },
-              ],
-              stateMutability: "nonpayable",
-              type: "constructor",
-            },
-            {
-              anonymous: false,
-              inputs: [
-                {
-                  indexed: true,
-                  internalType: "address",
-                  name: "greetingSetter",
-                  type: "address",
-                },
-                {
-                  indexed: false,
-                  internalType: "string",
-                  name: "newGreeting",
-                  type: "string",
-                },
-                {
-                  indexed: false,
-                  internalType: "bool",
-                  name: "premium",
-                  type: "bool",
-                },
-                {
-                  indexed: false,
-                  internalType: "uint256",
-                  name: "value",
-                  type: "uint256",
-                },
-              ],
-              name: "GreetingChange",
-              type: "event",
-            },
-            {
-              inputs: [],
-              name: "greeting",
-              outputs: [
-                {
-                  internalType: "string",
-                  name: "",
-                  type: "string",
-                },
-              ],
-              stateMutability: "view",
-              type: "function",
-            },
-            {
-              inputs: [],
-              name: "owner",
-              outputs: [
-                {
-                  internalType: "address",
-                  name: "",
-                  type: "address",
-                },
-              ],
-              stateMutability: "view",
-              type: "function",
-            },
-            {
-              inputs: [],
-              name: "premium",
-              outputs: [
-                {
-                  internalType: "bool",
-                  name: "",
-                  type: "bool",
-                },
-              ],
-              stateMutability: "view",
-              type: "function",
-            },
-            {
-              inputs: [
-                {
-                  internalType: "string",
-                  name: "_newGreeting",
-                  type: "string",
-                },
-              ],
-              name: "setGreeting",
-              outputs: [],
-              stateMutability: "payable",
-              type: "function",
-            },
-            {
-              inputs: [],
-              name: "totalCounter",
-              outputs: [
-                {
-                  internalType: "uint256",
-                  name: "",
-                  type: "uint256",
-                },
-              ],
-              stateMutability: "view",
-              type: "function",
-            },
-            {
-              inputs: [
-                {
-                  internalType: "address",
-                  name: "",
-                  type: "address",
-                },
-              ],
-              name: "userGreetingCounter",
-              outputs: [
-                {
-                  internalType: "uint256",
-                  name: "",
-                  type: "uint256",
-                },
-              ],
-              stateMutability: "view",
-              type: "function",
-            },
-            {
-              inputs: [],
-              name: "withdraw",
-              outputs: [],
-              stateMutability: "nonpayable",
-              type: "function",
-            },
-            {
-              stateMutability: "payable",
-              type: "receive",
             },
           ],
         },

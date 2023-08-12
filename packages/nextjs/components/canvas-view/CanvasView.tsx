@@ -12,21 +12,39 @@ export type Pixel = {
 
 type CanvasViewProps = {
   selectedColor: number;
+  setSelectedColor: (color: number) => void;
   committedPixels: number[];
   uncommittedPixels: Pixel[];
   setUncommittedPixels: (pixels: Pixel[]) => void;
+  isCanvasLocked: boolean;
 };
 
 export const CanvasView = ({
   selectedColor,
+  setSelectedColor,
   committedPixels,
   uncommittedPixels,
   setUncommittedPixels,
+  isCanvasLocked,
 }: CanvasViewProps) => {
-  const WIDTH = 16;
-  const HEIGHT = 16;
+  const WIDTH = 64;
+  const HEIGHT = 64;
 
   const [zoomLevel, setZoomLevel] = useState(100);
+
+  const getColorAtTile = (x: number, y: number): number => {
+    //look through the uncommitted pixels first
+    let color = 0;
+    for (let i = 0; i < uncommittedPixels.length; i++) {
+      const pixel = uncommittedPixels[i];
+      if (pixel.x == x && pixel.y == y) color = pixel.color;
+    }
+    if (color != 0) return color;
+    //look through the committed pixels
+    const index = x + y * WIDTH;
+    console.log("Click:" + committedPixels[index]);
+    return committedPixels[index];
+  };
 
   //handle clicks on the rectangles
   const handleClick = (e: React.MouseEvent<SVGSVGElement>) => {
@@ -41,8 +59,15 @@ export const CanvasView = ({
     const tileX = Math.floor((x / rect.width) * WIDTH);
     const tileY = Math.floor((y / rect.height) * HEIGHT);
 
-    const newPixel: Pixel = { x: tileX, y: tileY, color: selectedColor };
-    setUncommittedPixels([...uncommittedPixels, newPixel]);
+    //check if shift key is being pressed
+    if (e.shiftKey) {
+      console.log("Color Picker clicked tile:" + tileX + " " + tileY);
+      const pickedColor = getColorAtTile(tileX, tileY);
+      if (pickedColor != 0) setSelectedColor(pickedColor);
+    } else if (!isCanvasLocked) {
+      const newPixel: Pixel = { x: tileX, y: tileY, color: selectedColor };
+      setUncommittedPixels([...uncommittedPixels, newPixel]);
+    }
   };
 
   const viewBox = "0 0 " + WIDTH + " " + HEIGHT;

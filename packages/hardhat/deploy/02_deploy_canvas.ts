@@ -27,7 +27,7 @@ const deployColors: DeployFunction = async function (hre: HardhatRuntimeEnvironm
 
   await deploy("Canvas", {
     from: deployer,
-    args: [colorsContract.address],
+    //args: [colorsContract.address],
     log: true,
     // autoMine: can be passed to the deploy function to make the deployment process faster on local networks by
     // automatically mining the contract deployment transaction. There is no effect on live networks.
@@ -65,11 +65,11 @@ const deployColors: DeployFunction = async function (hre: HardhatRuntimeEnvironm
 
   //commit some pixels
   //const tx = await canvasContract.commitPixels(1, pixelData);
-  const xCoords = pixelData.map(p => p.x);
-  const yCoords = pixelData.map(p => p.y);
-  const iColors = pixelData.map(p => p.iColor);
 
-  const tx = await canvasContract.commitPixels(1, xCoords, yCoords, iColors);
+  const iColors = pixelData.map(p => p.iColor);
+  const offsets = pixelData.map(p => p.x + p.y * 16);
+
+  const tx = await canvasContract.commitPixels(1, iColors, offsets);
   console.log("commitPixels tx: ", tx);
 
   tokenURI = await canvasContract.tokenURI(1);
