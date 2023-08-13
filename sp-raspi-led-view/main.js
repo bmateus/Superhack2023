@@ -2,7 +2,7 @@ const LedMatrix = require("easybotics-rpi-rgb-led-matrix");
 
 const ethers = require("ethers");
 
-const { abi : canvasABI } = require("../packages/hardhat/artifacts/contracts/Canvas.sol/Canvas.json");
+const { abi : canvasABI } = require("./abi/Canvas.json");
 
 const canvasAddress = process.env.CONTRACT_ADDRESS;
 
