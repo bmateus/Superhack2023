@@ -66,6 +66,7 @@ export const CanvasView = ({
       if (pickedColor != 0) setSelectedColor(pickedColor);
     } else if (!isCanvasLocked) {
       const newPixel: Pixel = { x: tileX, y: tileY, color: selectedColor };
+      console.log("adding new pixel at " + tileX + " " + tileY);
       setUncommittedPixels([...uncommittedPixels, newPixel]);
     }
   };

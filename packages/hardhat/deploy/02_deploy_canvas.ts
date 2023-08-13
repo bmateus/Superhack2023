@@ -23,7 +23,7 @@ const deployColors: DeployFunction = async function (hre: HardhatRuntimeEnvironm
   const { deploy } = hre.deployments;
 
   //get the address of the colors contract
-  const colorsContract = await hre.deployments.get("Colors");
+  //const colorsContract = await hre.deployments.get("Colors");
 
   await deploy("Canvas", {
     from: deployer,
@@ -36,6 +36,10 @@ const deployColors: DeployFunction = async function (hre: HardhatRuntimeEnvironm
 
   //get canvas contract
   const canvasContract = await hre.ethers.getContract("Canvas", deployer);
+
+  //get canvas width
+  const canvasWidth = await canvasContract.CANVAS_WIDTH();
+  console.log("canvas width: ", canvasWidth.toString());
 
   //get the last canvas
   const totalSupply = await canvasContract.totalSupply();
@@ -51,23 +55,17 @@ const deployColors: DeployFunction = async function (hre: HardhatRuntimeEnvironm
   console.log("tokenURI: ", tokenURI);
 
   const pixelData: Canvas.PixelStruct[] = [
-    { x: 2, y: 2, iColor: 100 },
-    { x: 2, y: 3, iColor: 40 },
-    { x: 5, y: 5, iColor: 1000 },
-    { x: 15, y: 15, iColor: 2000 },
-    { x: 13, y: 2, iColor: 100 },
-    { x: 14, y: 3, iColor: 40 },
-    { x: 15, y: 5, iColor: 1000 },
-    { x: 15, y: 15, iColor: 2000 },
-    { x: 8, y: 5, iColor: 1 },
-    { x: 8, y: 8, iColor: 4096 },
+    { x: 0, y: 0, iColor: 4096 },
+    { x: canvasWidth-1, y: 0, iColor: 4096 },
+    { x: 0, y: canvasWidth-1, iColor: 4096 },
+    { x: canvasWidth-1, y: canvasWidth-1, iColor: 4096 },
   ];
 
   //commit some pixels
   //const tx = await canvasContract.commitPixels(1, pixelData);
 
   const iColors = pixelData.map(p => p.iColor);
-  const offsets = pixelData.map(p => p.x + p.y * 16);
+  const offsets = pixelData.map(p => p.x + p.y * canvasWidth);
 
   const tx = await canvasContract.commitPixels(1, iColors, offsets);
   console.log("commitPixels tx: ", tx);

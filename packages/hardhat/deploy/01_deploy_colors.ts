@@ -21,6 +21,8 @@ const deployColors: DeployFunction = async function (hre: HardhatRuntimeEnvironm
   const { deployer } = await hre.getNamedAccounts();
   const { deploy } = hre.deployments;
 
+  // disable this for now
+  /*
   await deploy("Colors", {
     from: deployer,
     log: true,
@@ -28,7 +30,7 @@ const deployColors: DeployFunction = async function (hre: HardhatRuntimeEnvironm
     // automatically mining the contract deployment transaction. There is no effect on live networks.
     autoMine: true,
   });
-
+*/
   // Get the deployed contract
   //const colors = await hre.ethers.getContract("Colors", deployer);
 

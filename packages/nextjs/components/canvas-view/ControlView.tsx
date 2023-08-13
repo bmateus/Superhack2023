@@ -12,13 +12,15 @@ type ControlViewProps = {
 };
 
 export const ControlView = (props: ControlViewProps) => {
-  //const LOCK_TIME_SECS = 60 * 60 * 8; // 8 hours
-  const LOCK_TIME_SECS = 60; // 1 minute
+  
+  const LOCK_TIME_SECS = 60 * 60 * 8; // 8 hours; TODO: get from contract
+  
+  const CANVAS_WIDTH = 64;
 
   const [title, setTitle] = useState("");
 
   const colors = props.uncommittedPixels.map(pixel => pixel.color);
-  const offsets = props.uncommittedPixels.map(pixel => pixel.x + pixel.y * 16);
+  const offsets = props.uncommittedPixels.map(pixel => pixel.x + pixel.y * CANVAS_WIDTH);
 
   const { writeAsync: sendCommitRequest, isLoading: waitingForCommit } = useScaffoldContractWrite({
     contractName: "Canvas",

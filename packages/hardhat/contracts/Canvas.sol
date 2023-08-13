@@ -282,6 +282,7 @@ contract Canvas is ERC721, ERC721Holder, Ownable {
 		svg = string(abi.encodePacked(svg, "</svg>"));
 	}
 
+
 	// override transfer behaviour;
 	// canvas can only be transferred if locked
 	// TODO: (maybe) royalties are paid to the color owners by their contribution amount
