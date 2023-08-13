@@ -19,7 +19,7 @@ The project is built using the following technologies:
 The contracts are deployed on Optimism Goerli
 https://goerli-optimism.etherscan.io/address/0xa1cf3f1329f74b289bace14a08e5d7ca2eda1d35
 
-You can try it ot for yourself here:
+You can try it out here:
 https://splatterparty.vercel.app/
 
 
