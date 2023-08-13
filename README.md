@@ -15,5 +15,12 @@ The idea for this project was to build a collaborative painting dapp that allows
 The project is built using the following technologies:
 - [Scaffold-Eth 2](https://github.com/scaffold-eth/scaffold-eth-2)
 
+## Demo
+The contracts are deployed on Optimism Goerli
+https://goerli-optimism.etherscan.io/address/0xa1cf3f1329f74b289bace14a08e5d7ca2eda1d35
+
+You can try it ot for yourself here:
+https://splatterparty.vercel.app/
+
 
 
