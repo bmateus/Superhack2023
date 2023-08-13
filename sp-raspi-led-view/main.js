@@ -1,4 +1,7 @@
-const LedMatrix = require("easybotics-rpi-rgb-led-matrix");
+require('dotenv').config();
+
+// see: https://github.com/alexeden/rpi-led-matrix
+const { LedMatrix } = require("rpi-led-matrix");
 
 const ethers = require("ethers");
 
@@ -18,7 +21,19 @@ provider.pollingInterval = 100;
 (async () => {
 
         // requires root
-        var matrix = new LedMatrix(64, 64);
+	const matrix = new LedMatrix(
+	{
+		...LedMatrix.defaultMatrixOptions(),
+		rows: 64,
+		cols: 64,
+	},
+	{
+		...LedMatrix.defaultRuntimeOptions(),
+		gpioSlowdown: 4,
+	}
+	)
+
+	matrix.clear().brightness(100);
 
         //call the contract
         const canvasContract = new ethers.Contract(canvasAddress, canvasABI, provider);
@@ -26,16 +41,31 @@ provider.pollingInterval = 100;
         const canvasWidth = Number(await canvasContract.CANVAS_WIDTH());
         console.log("Canvas Width:", canvasWidth);
 
-        const canvasData = await canvasContract.canvasData(1);    
+        const canvasData = await canvasContract.canvasData(1);
         console.log("Canvas Data:", canvasData);
 
         const pixels = await canvasContract.getPixels(1);
         console.log("Pixels:", pixels);
 
+	//set the pixels
+        for (let i = 0; i < pixels.length; i++) {
+            const x = i % canvasWidth;
+            const y = Math.floor(i / canvasWidth);
+            const color = Number(pixels[i]);
+            if (color > 0) {
+                const r = ((color >> 8) & 0xF) << 4;
+                const g = ((color >> 4) & 0xF) << 4;
+                const b = ((color & 0xF) << 4);
+                console.log("set pixel(", x, ",", y, "): ", r, g, b);
+		matrix.fgColor({ r: r, g: g, b: b}).setPixel(x, y);
+            }
+        }
+	matrix.sync();
+
         //event CanvasUpdated(uint256 tokenID, uint16[] colorIds, uint8[] positions);
         //event CanvasLocked(uint256 tokenID, string title);
-            
-        canvasContract.on("CanvasUpdated", (tokenId, colorIds, positions, event) => {      
+
+        canvasContract.on("CanvasUpdated", (tokenId, colorIds, positions, event) => {
 
             console.log("tokenId:", tokenId);
             console.log("colorIds:", colorIds);
@@ -45,23 +75,23 @@ provider.pollingInterval = 100;
             try {
                 //write this to the led matrix
                 for (let i = 0; i < positions.length; i++) {
-                    
+
                     const pos = Number(positions[i]);
                     const color = Number(colorIds[i]);
-                    
+
                     const x = pos % canvasWidth;
                     const y = Math.floor(pos / canvasWidth);
-                    
-                    const r = (color >> 8) & 0xFF;
-                    const g = (color >> 4) & 0xFF;
-                    const b = color & 0xFF;
+
+                    const r = (color >> 8) & 0xF;
+                    const g = (color >> 4) & 0xF;
+                    const b = color & 0xF;
 
                     console.log("set pixel:", x, y, r, g, b);
-                    matrix.setPixel(x, y, r, g, b);
+		    matrix.fgColor({r:r, g:g, b:b}).setPixel(x,y);
                 }
                 //update the led matrix
-                matrix.update();
-            } 
+		matrix.sync()
+            }
             catch (e) {
                 console.log("error:", e);
             }
