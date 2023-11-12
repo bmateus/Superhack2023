@@ -222,11 +222,11 @@ contract Canvas is ERC721, ERC721Holder, Ownable {
 			//create the metadata string
 			string memory metadata = string(
 				abi.encodePacked(
-					'{"name": ',
+					'{"name": "',
 					state.title,
 					'", "description": "Splatter Party #',
-					tokenID,
-					', "image": "data:image/svg+xml;utf8,',
+					string(tokenID),
+					'", "image": "data:image/svg+xml;utf8,',
 					state.svg,
 					'" }'
 				)

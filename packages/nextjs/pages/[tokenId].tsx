@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/router";
 import type { NextPage } from "next";
 import { MetaHeader } from "~~/components/MetaHeader";
@@ -8,33 +8,34 @@ import { PaletteView } from "~~/components/canvas-view/PaletteView";
 import { useScaffoldContractRead, useScaffoldEventSubscriber } from "~~/hooks/scaffold-eth";
 
 const CanvasTokenPage: NextPage = () => {
+  
   const router = useRouter();
   const { tokenId: selectedCanvas } = router.query as { tokenId?: number };
 
-  const [isCanvasLocked, setIsCanvasLocked] = useState(false);
-  const [canvasCreatedAt, setCanvasCreatedAt] = useState<Date>();
   const [selectedColor, setSelectedColor] = useState(0);
   const [uncommittedPixels, setUncommittedPixels] = useState<Pixel[]>([]);
-  const [canvasTitle, setCanvasTitle] = useState();
-
-  const { data: totalSupply, refetch: getTotalSupply } = useScaffoldContractRead({
-    contractName: "Canvas",
-    functionName: "totalSupply",
-  });
-
-  const { data: canvasState, refetch: getCanvasState } = useScaffoldContractRead({
+  
+  const { data: canvasState, refetch: refetchCanvasState } = useScaffoldContractRead({
     contractName: "Canvas",
     functionName: "canvasData",
-    args: [BigInt(selectedCanvas ?? 0)],
+    args: [BigInt(selectedCanvas ?? 1)],
   });
 
-  const { data: committedPixels, refetch: getCommittedPixels } = useScaffoldContractRead({
+  let canvasCreatedAt = new Date((canvasState ? Number(canvasState[0]) : 0) * 1000);
+  let canvasTitle: string = (!canvasState || canvasState[1] === "") ? "Canvas #" + Number(selectedCanvas) : canvasState[1];
+  let isCanvasLocked = canvasState ? Boolean(canvasState[2]) : false;
+
+  console.log("Canvas State", canvasState);
+
+  const { data: committedPixels, refetch: refetchCommittedPixels } = useScaffoldContractRead({
     contractName: "Canvas",
     functionName: "getPixels",
-    args: [BigInt(selectedCanvas ?? 0)],
+    args: [BigInt(selectedCanvas ?? 1)],
   });
 
-  //listen for CanvasUpdated events
+  console.log("Committed Pixels", committedPixels);
+
+  //listen for CanvasUpdated events so we can update the canvas
   useScaffoldEventSubscriber({
     contractName: "Canvas",
     eventName: "CanvasUpdated",
@@ -50,29 +51,11 @@ const CanvasTokenPage: NextPage = () => {
       });
       //refresh the canvas
       if (shouldRefresh) {
-        getCommittedPixels();
+        refetchCanvasState();
+        refetchCommittedPixels();
       }
     },
   });
-
-  useEffect(() => {
-    Promise.all([
-      getCanvasState().then(() => {
-        //console.log("Canvas State", canvasState);
-        let createdAt = canvasState ? Number(canvasState[0]) : 0;
-        console.log("Canvas Created At", new Date(createdAt * 1000));
-        let title: string = canvasState ? canvasState[1] : "New Canvas";
-        if (title == "") title = "Canvas #" + Number(selectedCanvas);
-        const isLocked: boolean = canvasState ? Boolean(canvasState[2]) : false;
-        setCanvasCreatedAt(new Date(createdAt * 1000));
-        setCanvasTitle(title);
-        setIsCanvasLocked(isLocked);
-      }),
-      getCommittedPixels(),
-    ]).then(() => {
-      //console.log("..done refetching");
-    });
-  }, [getCommittedPixels, getCanvasState, selectedCanvas, canvasState]);
 
   return (
     //check if selected canvas is valid
@@ -82,7 +65,16 @@ const CanvasTokenPage: NextPage = () => {
         {(selectedCanvas && (
           <>
             <div className="flex-none">
-              <PaletteView selectedColor={selectedColor} onColorSelected={color => setSelectedColor(color)} />
+              
+              { !isCanvasLocked && 
+              (
+                <PaletteView 
+                  selectedColor={selectedColor} 
+                  onColorSelected={color => setSelectedColor(color)} 
+                />
+              )
+              }
+
               <ControlView
                 selectedCanvas={selectedCanvas}
                 uncommittedPixels={uncommittedPixels}
@@ -90,6 +82,7 @@ const CanvasTokenPage: NextPage = () => {
                 isCanvasLocked={isCanvasLocked}
                 canvasCreatedAt={canvasCreatedAt}
               />
+
             </div>
             <div className="flex-grow m-16">
               <div className="flex flex-row place-items-center">

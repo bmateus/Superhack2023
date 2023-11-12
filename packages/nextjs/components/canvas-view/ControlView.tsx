@@ -1,14 +1,13 @@
 import { useEffect, useState } from "react";
 import { Pixel } from "./CanvasView";
 import { useScaffoldContractRead, useScaffoldContractWrite } from "~~/hooks/scaffold-eth";
-import { Router } from "next/router";
 
 type ControlViewProps = {
   selectedCanvas: number;
   uncommittedPixels: Pixel[];
   setUncommittedPixels: (pixels: Pixel[]) => void;
   isCanvasLocked: boolean;
-  canvasCreatedAt: Date;
+  canvasCreatedAt: Date | null;
 };
 
 export const ControlView = (props: ControlViewProps) => {
@@ -25,7 +24,7 @@ export const ControlView = (props: ControlViewProps) => {
   const { writeAsync: sendCommitRequest, isLoading: waitingForCommit } = useScaffoldContractWrite({
     contractName: "Canvas",
     functionName: "commitPixels",
-    args: [BigInt(props.selectedCanvas ?? 0), colors, offsets],
+    args: [BigInt(props.selectedCanvas ?? 1), colors, offsets],
     onBlockConfirmation: txnReceipt => {
       console.log("📦 Transaction blockHash", txnReceipt.blockHash);
       //clear uncommitted pixels
@@ -36,20 +35,11 @@ export const ControlView = (props: ControlViewProps) => {
   const { writeAsync: sendLockRequest, isLoading: waitingForLock } = useScaffoldContractWrite({
     contractName: "Canvas",
     functionName: "lockCanvas",
-    args: [BigInt(props.selectedCanvas ?? 0), title],
+    args: [BigInt(props.selectedCanvas ?? 1), title],
     onBlockConfirmation: txnReceipt => {
       console.log("📦 Transaction blockHash", txnReceipt.blockHash);
       //clear uncommitted pixels
       props.setUncommittedPixels([]);
-    },
-  });
-
-  const { writeAsync: sendCreateRequest, isLoading: waitingForCreate } = useScaffoldContractWrite({
-    contractName: "Canvas",
-    functionName: "createNewCanvas",
-    onBlockConfirmation: txnReceipt => {
-      console.log("📦 Transaction blockHash", txnReceipt.blockHash);
-      //go to the new canvas page  
     },
   });
 
@@ -75,11 +65,6 @@ export const ControlView = (props: ControlViewProps) => {
   const onClickLock = () => {
     console.log("Lock");
     sendLockRequest();
-  };
-
-  const onClickNew = () => {
-    console.log("Create");
-    sendCreateRequest();
   };
 
   const updateSecondsRemaining = () => {
@@ -113,16 +98,21 @@ export const ControlView = (props: ControlViewProps) => {
   const { data: contributors, refetch: getContributors } = useScaffoldContractRead({
     contractName: "Canvas",
     functionName: "getContributors",
-    args: [BigInt(props.selectedCanvas ?? 0)],
+    args: [BigInt(props.selectedCanvas ?? 1)],
   });
 
   useEffect(() => {
+    console.log("Refresh contributors");
     getContributors();
+    console.log("Contributors", contributors);
   }, [props.isCanvasLocked]);
+
+
 
   return (
     <>
-      {!props.isCanvasLocked && (
+      { //unlocked view
+        !props.isCanvasLocked && (
         <div className="m-16 flex flex-col gap-4">
           Uncomitted Pixels: {props.uncommittedPixels.length}
           <button className="btn btn-primary btn-sm font-normal cursor-auto flex" onClick={onClickUndo}>
@@ -158,11 +148,15 @@ export const ControlView = (props: ControlViewProps) => {
           {secondsRemaining > 0 && <div className="text-accent">Canvas can be locked in {unlocksIn()}</div>}
         </div>
       )}
-      {props.isCanvasLocked && (
-        <>
-          <div className="m-16 flex flex-col gap-4">Contributors:
-          {contributors &&
-            contributors[0].map((contributor, index) => {
+      
+      {
+        //locked view
+        props.isCanvasLocked && 
+        <div className="m-16 flex flex-col gap-4">                                  
+          { contributors &&                                      
+            (<>
+            <h3>Contributors:</h3>  
+            {contributors[0].map((contributor, index) => {
               return (
                 <div className="flex flex-col" key={index}>
                   <div className="text-accent">
@@ -171,12 +165,14 @@ export const ControlView = (props: ControlViewProps) => {
                 </div>
               );
             })}
-            <button className="btn btn-primary flex" onClick={onClickNew}>
-              New Canvas
-              </button>
-              </div>
-        </>
-      )}
+
+            </>)
+          }
+
+        </div>        
+      }
+
+
     </>
   );
 };
